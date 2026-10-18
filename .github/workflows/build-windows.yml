@@ -1,0 +1,60 @@
+name: Build Windows app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v5
+
+      - name: Unpack the project
+        shell: pwsh
+        run: |
+          if (-not (Test-Path package.json)) {
+            if (-not (Test-Path pocket-player-desktop.zip)) {
+              Write-Error "pocket-player-desktop.zip not found. Upload it to the repository first."
+              exit 1
+            }
+            Expand-Archive pocket-player-desktop.zip -DestinationPath "$env:RUNNER_TEMP\pp" -Force
+            Copy-Item "$env:RUNNER_TEMP\pp\pocket-player-desktop\*" . -Recurse -Force
+          }
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm install
+
+      - name: Set the version number
+        run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+
+      - name: Build the installer
+        run: npx electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Keep the files with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketPlayer-Windows
+          path: dist/*.exe
+
+      - name: Publish a release you can download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pc-${{ github.run_number }}
+          name: Pocket Player for Windows 1.0.${{ github.run_number }}
+          body: |
+            PocketPlayer-Setup is the normal installer (adds a Start menu and desktop shortcut).
+            PocketPlayer-Portable runs without installing.
+          files: dist/*.exe
