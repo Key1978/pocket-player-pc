@@ -124,7 +124,12 @@ function serveAppFile(candidates) {
       });
     } catch (e) { /* try the next one */ }
   }
-  return new Response('Not found: ' + path.basename(candidates[0] || ''), { status: 404 });
+  // Show what the app can see, so a missing file is easy to track down
+  let seen = '';
+  try { seen += 'App folder: ' + __dirname + '\n  ' + fs.readdirSync(__dirname).join('\n  ') + '\n'; } catch (e) { seen += 'App folder unreadable: ' + e.message + '\n'; }
+  try { seen += 'www folder:\n  ' + fs.readdirSync(WWW).join('\n  ') + '\n'; } catch (e) { seen += 'www folder missing (' + e.code + ')\n'; }
+  return new Response('Not found: ' + path.basename(candidates[0] || '') + '  (version ' + app.getVersion() + ')\n\n' + seen,
+    { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }
 
 /* Internet radio and podcast streams are passed through the app so http-only stations still play. */

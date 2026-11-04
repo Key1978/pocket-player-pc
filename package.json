@@ -89,6 +89,7 @@
         "name": "Video file",
         "role": "Viewer"
       }
-    ]
+    ],
+    "asar": false
   }
 }
