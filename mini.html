@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pocket Player</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Figtree:wght@500;600&display=swap">
+<style>
+/* Mini player: a small always-on-top bar. Deliberately dark in every theme so it sits well over any app. */
+:root{--h:172;--bg:#121218;--fg:#F2F2F6;--muted:#9A9AAB;--line:rgba(255,255,255,.14);--accent:hsl(var(--h) 62% 56%);--accent-ink:hsl(var(--h) 70% 9%);--heart:#FF6B8E;color-scheme:dark}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px "Figtree",system-ui,"Segoe UI",sans-serif;overflow:hidden;user-select:none}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg{display:block}
+.wrap{position:relative;height:100%;display:grid;grid-template-columns:132px minmax(0,1fr);-webkit-app-region:drag}
+.art{width:132px;height:132px;background:linear-gradient(140deg,hsl(var(--h) 62% 50%),hsl(calc(var(--h) + 48) 58% 30%));background-size:cover;background-position:center;
+  display:grid;place-items:center;font:800 44px/1 "Bricolage Grotesque",system-ui,sans-serif;color:rgba(255,255,255,.92)}
+.body{display:grid;grid-template-rows:auto auto 1fr auto;padding:12px 12px 0 14px;min-width:0}
+.t{font:800 16px/1.25 "Bricolage Grotesque",system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:62px;letter-spacing:-.01em}
+.a{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{display:flex;align-items:center;gap:4px;align-self:center}
+.ctl button,.top button{-webkit-app-region:no-drag;border:0;background:transparent;border-radius:999px;padding:7px;display:grid;place-items:center}
+.ctl button:hover,.top button:hover{background:rgba(255,255,255,.1)}
+.ctl .play{width:42px;height:42px;background:var(--accent);color:var(--accent-ink)}
+.ctl .play:hover{background:var(--accent);filter:brightness(1.1)}
+.fav{color:var(--muted)}
+.fav[aria-pressed="true"]{color:var(--heart)}
+.fav svg{fill:none;stroke:currentColor;stroke-width:2}
+.fav[aria-pressed="true"] svg{fill:currentColor}
+.top{position:absolute;top:6px;right:6px;display:flex;gap:2px}
+.top button{color:var(--muted);padding:6px}
+.top button:hover{color:var(--fg)}
+.bar{height:18px;-webkit-app-region:no-drag;cursor:pointer;display:flex;align-items:center}
+.bar i{display:block;height:3px;width:100%;background:var(--line);border-radius:3px;overflow:hidden}
+.bar b{display:block;height:100%;width:0;background:var(--accent)}
+.bar:hover i{height:5px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="5" width="4.2" height="14" rx="1.2"/><rect fill="currentColor" x="13.8" y="5" width="4.2" height="14" rx="1.2"/></symbol>
+  <symbol id="next" viewBox="0 0 24 24"><path fill="currentColor" d="M5 6.2v11.6a.9.9 0 0 0 1.4.75L15 12.75a.9.9 0 0 0 0-1.5L6.4 5.45A.9.9 0 0 0 5 6.2z"/><rect fill="currentColor" x="16.5" y="5" width="2.6" height="14" rx="1"/></symbol>
+  <symbol id="prev" viewBox="0 0 24 24"><g transform="matrix(-1 0 0 1 24 0)"><path fill="currentColor" d="M5 6.2v11.6a.9.9 0 0 0 1.4.75L15 12.75a.9.9 0 0 0 0-1.5L6.4 5.45A.9.9 0 0 0 5 6.2z"/><rect fill="currentColor" x="16.5" y="5" width="2.6" height="14" rx="1"/></g></symbol>
+  <symbol id="heart" viewBox="0 0 24 24"><path stroke-linejoin="round" d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="expand" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></symbol>
+  <symbol id="close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+<div class="wrap">
+  <div class="art" id="art">♪</div>
+  <div class="body">
+    <div class="t" id="title">Nothing playing</div>
+    <div class="a" id="artist">Pocket Player</div>
+    <div class="ctl">
+      <button id="prev" aria-label="Previous"><svg width="22" height="22"><use href="#prev"/></svg></button>
+      <button class="play" id="play" aria-label="Play"><svg width="22" height="22"><use href="#play"/></svg></button>
+      <button id="next" aria-label="Next"><svg width="22" height="22"><use href="#next"/></svg></button>
+      <button class="fav" id="fav" aria-pressed="false" aria-label="Favourite"><svg width="18" height="18"><use href="#heart"/></svg></button>
+    </div>
+    <div class="bar" id="bar" role="slider" aria-label="Position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0"><i><b id="fill"></b></i></div>
+  </div>
+  <div class="top">
+    <button id="expand" title="Open the full player" aria-label="Open the full player"><svg width="16" height="16"><use href="#expand"/></svg></button>
+    <button id="close" title="Close the mini player" aria-label="Close the mini player"><svg width="16" height="16"><use href="#close"/></svg></button>
+  </div>
+</div>
+<script>
+(() => {
+  const P = window.pocketDesktop;
+  const $ = (s) => document.querySelector(s);
+  let st = { has: false }, at = performance.now();
+  function paint(){
+    document.documentElement.style.setProperty('--h', st.h || 172);
+    $('#title').textContent = st.has ? st.title : 'Nothing playing';
+    $('#artist').textContent = st.has ? (st.artist || (st.kind === 'video' ? 'Video' : 'Unknown artist')) : 'Pocket Player';
+    const art = $('#art');
+    if (st.art){ art.style.backgroundImage = `url("${st.art}")`; art.textContent = ''; }
+    else { art.style.backgroundImage = ''; const m = (st.title || '').match(/[\p{L}\p{N}]/u); art.textContent = st.has && m ? m[0].toUpperCase() : '♪'; }
+    $('#play use').setAttribute('href', st.playing ? '#pause' : '#play');
+    $('#play').setAttribute('aria-label', st.playing ? 'Pause' : 'Play');
+    $('#fav').setAttribute('aria-pressed', !!st.fav);
+    document.title = st.has ? `${st.title} · Pocket Player` : 'Pocket Player';
+  }
+  function tick(){
+    let pos = st.pos || 0;
+    if (st.playing) pos += (performance.now() - at) / 1000;
+    const pct = st.dur > 0 ? Math.min(100, pos / st.dur * 100) : 0;
+    $('#fill').style.width = pct + '%';
+    $('#bar').setAttribute('aria-valuenow', Math.round(pct));
+    requestAnimationFrame(tick);
+  }
+  function setState(s){ if (!s) return; st = s; at = performance.now(); paint(); }
+  if (P){
+    P.onState(setState);
+    P.getState().then(setState).catch(() => {});
+    $('#prev').onclick = () => P.command('prev');
+    $('#next').onclick = () => P.command('next');
+    $('#play').onclick = () => P.command('toggle');
+    $('#fav').onclick = () => P.command('fav');
+    $('#expand').onclick = () => P.miniExpand();
+    $('#close').onclick = () => P.miniClose();
+    $('#bar').onclick = (e) => { const r = $('#bar').getBoundingClientRect(); P.command('seek', (e.clientX - r.left) / r.width); };
+    $('#bar').onkeydown = (e) => {
+      if (!st.dur) return;
+      const cur = (st.pos || 0) / st.dur;
+      if (e.key === 'ArrowRight') P.command('seek', Math.min(1, cur + 10 / st.dur));
+      if (e.key === 'ArrowLeft') P.command('seek', Math.max(0, cur - 10 / st.dur));
+    };
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.target.closest('button')){ e.preventDefault(); P.command('toggle'); }
+      if (e.key === 'Escape') P.miniExpand();
+    });
+  }
+  paint(); tick();
+})();
+</script>
+</body>
+</html>
