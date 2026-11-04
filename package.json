@@ -3,7 +3,7 @@
   "productName": "Pocket Player",
   "version": "1.0.0",
   "description": "Ad-free music and video player",
-  "author": "Pocket Player",
+  "author": "Pocket Player",https://github.com/Key1978/pocket-player-pc/blob/main/package.json
   "license": "UNLICENSED",
   "main": "main.js",
   "scripts": {
