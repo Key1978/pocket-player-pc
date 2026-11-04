@@ -111,6 +111,22 @@ async function serve(file, req) {
   });
 }
 
+/* The app's own page files live inside the packed app (app.asar). The simple, synchronous
+   file functions always work there, so they are used for these small files. */
+function serveAppFile(candidates) {
+  for (const file of candidates) {
+    try {
+      if (!fs.statSync(file).isFile()) continue;
+      const data = fs.readFileSync(file);
+      return new Response(data, {
+        status: 200,
+        headers: { 'Content-Type': MIME[ext(file)] || 'application/octet-stream', 'Content-Length': String(data.length) }
+      });
+    } catch (e) { /* try the next one */ }
+  }
+  return new Response('Not found: ' + path.basename(candidates[0] || ''), { status: 404 });
+}
+
 /* Internet radio and podcast streams are passed through the app so http-only stations still play. */
 async function proxyStream(target, req) {
   if (!/^https?:\/\//i.test(target)) return new Response('Bad link', { status: 400 });
@@ -152,13 +168,15 @@ function registerProtocol() {
     if (p.startsWith('/art/')) return serve(path.join(artDir, path.basename(p.slice(5))), req);
     if (p === '/stream') return proxyStream(u.searchParams.get('u') || '', req);
     if (p === '/vendor/jsmediatags.min.js') {
-      try { return serve(require.resolve('jsmediatags/dist/jsmediatags.min.js'), req); }
-      catch (e) { return new Response('', { status: 404 }); }
+      return serveAppFile([
+        path.join(__dirname, 'node_modules', 'jsmediatags', 'dist', 'jsmediatags.min.js'),
+        path.join(WWW, 'vendor', 'jsmediatags.min.js')
+      ]);
     }
     const rel = p.replace(/^\/+/, '') || 'index.html';
     const full = path.normalize(path.join(WWW, rel));
     if (!full.startsWith(WWW)) return new Response('Not allowed', { status: 403 });
-    return serve(full, req);
+    return serveAppFile([full]);
   });
 }
 
