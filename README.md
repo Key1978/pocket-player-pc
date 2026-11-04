@@ -1,47 +1,41 @@
-# Pocket Player
+# Pocket Player for Windows
 
-An ad-free music and video player for Android. GitHub builds the APK for you every time you upload a change.
+An ad-free music and video player for your PC. GitHub builds the installer for you.
 
-## Get the APK (works from your phone)
+## Get the app
 
-1. Sign in to [github.com](https://github.com) and create a new repository called `pocket-player`. Private is fine.
-2. Tap **Add file › Upload files**, choose `pocket-player-android.zip` (don't unzip it), then **Commit changes**.
-3. Tap **Add file › Create new file**. Name it exactly `.github/workflows/build-apk.yml`, paste in the contents of `build-apk.yml`, then **Commit changes**.
-4. Open the **Actions** tab. The **Build APK** run starts by itself and takes about 5–8 minutes.
-5. When it shows a green tick, open **Releases** on the repository's main page, then **Pocket Player 1.x**, and tap **PocketPlayer.apk** to download it.
-6. Open the downloaded file. If Android asks, allow your browser to install unknown apps, then tap **Install**.
+1. On github.com, create a new repository called `pocket-player-pc` (Private is fine).
+2. Tap **uploading an existing file**, upload `pocket-player-desktop.zip` as it is, and **Commit changes**.
+3. **Add file › Create new file**, name it `.github/workflows/build-windows.yml`, paste in the contents of `build-windows.yml`, and **Commit changes**.
+4. Open **Actions** and wait for **Build Windows app** to show a green tick (about 5–10 minutes).
+5. Open **Releases › Pocket Player for Windows**, download **PocketPlayer-Setup-1.0.x.exe** and run it.
 
-From a computer you can instead unzip the project and push the folder's contents with git:
+Windows SmartScreen warns about apps that aren't code-signed. Click **More info › Run anyway**.
 
-```
-cd pocket-player-android
-git init -b main
-git add .
-git commit -m "Pocket Player"
-git remote add origin https://github.com/YOUR-NAME/pocket-player.git
-git push -u origin main
-```
+## What it does on a PC
 
-## Updating the app
+- Finds every song and video in your Music and Videos folders, plus any folder you add with **Add folder**. New files show up by themselves.
+- Reads song titles, artists, albums and album art from the files. **⋯ › Edit details** fixes them (saved into MP3 files).
+- **Lyrics**: found online automatically (from the free LRCLIB library), or press **+ Lyrics** on the record to paste them in and tap along to time each line. Saved as an `.lrc` file next to the song. Press **Y** to show or hide.
+- **Playlists**: make them from the ⋯ menu, drag songs to reorder, import and export `.m3u` files. **Play next** and **Add to queue** too.
+- **Mini player**: a small always-on-top window (Ctrl+Alt+M).
+- **System tray**: closing the window keeps the music playing; right-click the tray icon for controls.
+- **Taskbar**: previous / play / next buttons when you hover the taskbar icon, and song progress on the icon.
+- **Global hotkeys** that work in any app: Ctrl+Alt+Space, Ctrl+Alt+← / →, Ctrl+Alt+↑ / ↓, Ctrl+Alt+L.
+- **Crossfade**, **even out volume**, and a **sound output** picker (speakers, headphones, TV).
+- **Full-screen visualizer** (V) in Boxy or Rings style and a monthly **listening stats** page.
+- **Sleep timer** can pause music, put the PC to sleep, or shut it down (with a 60-second cancel).
+- Song-change notifications, start with Windows, and Discord "Listening to" status.
+- Right-click a music or video file › **Open with › Pocket Player** to play it.
+- **Download from a link**: paste a link (or press Ctrl+V anywhere, or drag a link in) to download music and videos with progress, cancel and retry. Works with direct file links, Dropbox and Google Drive share links, and web pages with audio or video on them. Streaming services such as YouTube and Spotify don't allow downloads.
+- **Internet radio**: thousands of live stations by name, genre or country; save your favourites.
+- **Podcasts**: search, subscribe, stream episodes or download them.
+- **Albums and Artists** views, **smart playlists** (Recently added, Most played, Not played yet), an editable **Up next** queue, and a keyboard shortcut list (press ?).
+- Everything from the other versions: equalizer, speed, video tools, themes, favourites and Hearing boost.
 
-Upload a new `pocket-player-android.zip` (replacing the old one), or change `www/index.html` and push it if you used git. Each build gets a higher version number and is signed with the same key in `keystore/`, so it installs over the previous version and keeps your settings. You can also start a build by hand: **Actions › Build APK › Run workflow**.
+## Files
 
-## What the app can do
-
-- Finds every song and video on the phone automatically (asks for permission the first time). Tap **Rescan phone** after adding new files.
-- Album art and video thumbnails, favourites, sorting, search, shuffle, repeat, sleep timer, A–B loop, speed control.
-- 10-band equalizer, video tools (pop-out, rotate, zoom, picture adjustments, subtitles), light and dark themes.
-- Keeps playing with the screen off. The back button sends the app to the background instead of stopping it.
-- **Hearing boost**: only starts when Bluetooth earbuds are connected, and stops by itself if they disconnect.
-
-## About the signing key
-
-`keystore/pocket-player.jks` (password `pocketplayer`) signs every build so updates install cleanly. Anyone who can see the repository can sign apps with it, so keep the repository **private** if you share your GitHub account or plan to give the app to others.
-
-## Project layout
-
-- `www/index.html`: the whole player (the same page as the web version)
-- `native/java/`: Android code for the phone scan, earbud check and background playback
-- `native/res/`: app icon
-- `scripts/customize-android.mjs`: adds the native code, permissions, icon and signing to the Android project during the build
-- `.github/workflows/build-apk.yml`: the GitHub build
+- `main.js`: the desktop window, folder scanning, tags and album art
+- `preload.js`: the bridge between the window and the player page
+- `www/index.html`: the player
+- `build/`: app icon
