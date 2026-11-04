@@ -1,0 +1,12 @@
+{
+  "appId": "com.pocketplayer.app",
+  "appName": "Pocket Player",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#101014",
+    "allowMixedContent": false
+  }
+}

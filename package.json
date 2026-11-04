@@ -1,92 +1,17 @@
 {
   "name": "pocket-player",
-  "productName": "Pocket Player",
   "version": "1.0.0",
-  "description": "Ad-free music and video player",
-  "author": "Pocket Player",
-  "license": "UNLICENSED",
-  "main": "main.js",
+  "private": true,
+  "description": "Ad-free music and video player for Android, built with Capacitor.",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win --x64 --publish never"
+    "android:prepare": "npx cap add android && node scripts/customize-android.mjs && npx cap sync android"
   },
   "dependencies": {
-    "jsmediatags": "^3.9.5",
-    "node-id3": "^0.2.6"
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "jsmediatags": "^3.9.5"
   },
   "devDependencies": {
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "com.pocketplayer.desktop",
-    "productName": "Pocket Player",
-    "files": [
-      "main.js",
-      "downloads.js",
-      "preload.js",
-      "www/**/*",
-      "build/icon.png",
-      "build/thumb/*.png",
-      "package.json"
-    ],
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Pocket Player",
-      "artifactName": "PocketPlayer-Setup-${version}.exe"
-    },
-    "portable": {
-      "artifactName": "PocketPlayer-Portable-${version}.exe"
-    },
-    "fileAssociations": [
-      {
-        "ext": [
-          "mp3",
-          "m4a",
-          "aac",
-          "flac",
-          "wav",
-          "ogg",
-          "opus"
-        ],
-        "name": "Audio file",
-        "role": "Viewer"
-      },
-      {
-        "ext": [
-          "mp4",
-          "m4v",
-          "mkv",
-          "webm",
-          "mov"
-        ],
-        "name": "Video file",
-        "role": "Viewer"
-      }
-    ]
+    "@capacitor/cli": "^7.0.0"
   }
 }
