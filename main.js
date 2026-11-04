@@ -176,7 +176,8 @@ function registerProtocol() {
     const rel = p.replace(/^\/+/, '') || 'index.html';
     const full = path.normalize(path.join(WWW, rel));
     if (!full.startsWith(WWW)) return new Response('Not allowed', { status: 403 });
-    return serveAppFile([full]);
+    // also look next to main.js, in case the page files were uploaded without their www folder
+    return serveAppFile([full, path.join(__dirname, path.basename(rel))]);
   });
 }
 

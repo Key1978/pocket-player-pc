@@ -1,11 +1,10 @@
 {
-    
-     "name": "pocket-player",
-     "productName": "Pocket Player",
-     "version": "1.0.0",
-     "description": "Ad-free music and video player",
-     "author": "Pocket Player",
-     "license": "UNLICENSED",
+  "name": "pocket-player",
+  "productName": "Pocket Player",
+  "version": "1.0.0",
+  "description": "Ad-free music and video player",
+  "author": "Pocket Player",
+  "license": "UNLICENSED",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -27,6 +26,8 @@
       "downloads.js",
       "preload.js",
       "www/**/*",
+      "mini.html",
+      "index.html",
       "build/icon.png",
       "build/thumb/*.png",
       "package.json"
