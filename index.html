@@ -398,6 +398,7 @@ output,.pval{font-family:var(--f-mono);font-size:12px;color:var(--ink);font-vari
 @media (max-height:600px){.drive-art{display:none}.drive-ctl button{width:80px;height:80px}.drive-ctl button.big{width:104px;height:104px}}
 /* devices */
 .dev-me{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end;justify-content:space-between;padding:14px;border-radius:14px;background:var(--soft)}
+.dev-routes{font-size:11px;opacity:.6;margin-top:2px}
 .dev-code{font:700 30px/1.1 var(--f-mono);letter-spacing:.08em;user-select:all}
 .dev-status{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .dev-me .field{flex:1 1 180px;max-width:260px}
@@ -3331,7 +3332,7 @@ let myName = ls.get('pp.devname', DESK ? 'Windows PC' : NATIVE ? 'Android phone'
 let paired = ls.get('pp.paired', {});
 let linkAllowRemote = ls.get('pp.linkRemote', true), linkAllowBrowse = ls.get('pp.linkBrowse', true);
 const peers = new Map(), xfers = new Map(), pendingCands = new Map();
-const sig = { ws: null, open: false, retry: 0, hb: null, status: 'off' };
+const sig = { ws: null, open: false, retry: 0, hb: null, status: 'off', pstatus: 'off' };
 const tg = { host: '', guests: new Set(), offset: 0, n: 0, ping: null, lastSync: null };
 const SIG_URL = () => ls.get('pp.sigUrl', 'wss://0.peerjs.com/peerjs');
 const RTC_CFG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }] };
@@ -3342,7 +3343,23 @@ const kindLabel = k => k === 'windows' ? 'Windows PC' : k === 'android' ? 'Andro
 const openPeers = () => [...peers.values()].filter(p => p.state === 'open');
 const savePaired = () => ls.set('pp.paired', paired);
 
-function linkStatus(st){ sig.status = st; paintDevicesStatus(); }
+/* Devices find each other through two independent free relays, so linking still works when one is down:
+   the PeerJS service, and ntfy.sh. Only the setup messages go through them; songs go directly device to device. */
+const NTFY_URL = () => ls.get('pp.ntfyUrl', 'https://ntfy.sh');
+const nt = { ws: null, open: false, retry: 0, connecting: false };
+const seenMids = new Set();
+const sigReady = () => sig.open || nt.open;
+function linkStatus(st){ if (st) sig.pstatus = st; paintDevicesStatus(); }
+function overallStatus(){
+  if (sigReady()) return 'ready';
+  if (navigator.onLine === false) return 'offline';
+  if (sig.pstatus === 'connecting' || sig.pstatus === 'taken' || nt.connecting) return 'connecting';
+  return 'offline';
+}
+function onRouteUp(){
+  paintDevicesStatus();
+  for (const code of Object.keys(paired)) if (!peers.has(code)) connectTo(code, true);
+}
 function sigConnect(){
   if (!LINK.on) return;
   try { if (sig.ws){ sig.ws.onclose = null; sig.ws.close(); } } catch(e){}
@@ -3352,38 +3369,88 @@ function sigConnect(){
   try { ws = new WebSocket(`${SIG_URL()}?key=peerjs&id=${encodeURIComponent(peerIdOf(myCode))}&token=${token}&version=1.5.4`); }
   catch(e){ linkStatus('offline'); return; }
   sig.ws = ws; linkStatus('connecting');
-  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch(err){ return; } onSig(m); };
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch(err){ return; } onPeerjs(m); };
   ws.onclose = () => {
     if (sig.ws !== ws) return;
     sig.open = false; clearInterval(sig.hb);
-    linkStatus(navigator.onLine === false ? 'offline' : sig.status === 'taken' ? 'taken' : 'offline');
+    linkStatus(sig.pstatus === 'taken' ? 'taken' : 'offline');
     setTimeout(sigConnect, Math.min(30000, 2000 * Math.max(1, ++sig.retry)));
   };
   ws.onerror = () => {};
 }
+function ntConnect(){
+  if (!LINK.on) return;
+  try { if (nt.ws){ nt.ws.onclose = null; nt.ws.close(); } } catch(e){}
+  nt.open = false; nt.connecting = true; paintDevicesStatus();
+  let ws;
+  try { ws = new WebSocket(NTFY_URL().replace(/^http/, 'ws') + '/' + peerIdOf(myCode) + '/ws'); }
+  catch(e){ nt.connecting = false; paintDevicesStatus(); return; }
+  nt.ws = ws;
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch(err){ return; }
+    if (m.event === 'open'){ const was = nt.open; nt.open = true; nt.connecting = false; nt.retry = 0; if (!was) onRouteUp(); return; }
+    if (m.event !== 'message' || typeof m.message !== 'string') return;
+    let x; try { x = JSON.parse(m.message); } catch(err){ return; }
+    if (x && x.dst === peerIdOf(myCode)) onSig(x, 'ntfy');
+  };
+  ws.onclose = () => {
+    if (nt.ws !== ws) return;
+    const was = nt.open; nt.open = false; nt.connecting = false; paintDevicesStatus();
+    setTimeout(ntConnect, Math.min(30000, 3000 * Math.max(1, ++nt.retry)));
+    if (was) paintDevicesStatus();
+  };
+  ws.onerror = () => {};
+}
 function sigSend(obj){ if (sig.ws && sig.ws.readyState === 1){ try { sig.ws.send(JSON.stringify(obj)); } catch(e){} } }
-function sigTo(code, type, payload){ sigSend({ type, dst: peerIdOf(code), payload }); }
-function onSig(m){
+function ntPost(code, obj){
+  let body = JSON.stringify(obj);
+  if (body.length > 4000) return; /* ntfy turns bigger messages into attachments */
+  fetch(NTFY_URL() + '/' + peerIdOf(code), { method: 'POST', body }).catch(() => {});
+}
+/* Sent through every route that's up; the other device ignores the second copy. */
+function sigTo(code, type, payload){
+  const mid = Math.random().toString(36).slice(2, 12);
+  const msg = { type, dst: peerIdOf(code), payload: Object.assign({}, payload, { mid }), mid };
+  const p = peers.get(code), via = p && p.via;
+  if (sig.open && via !== 'ntfy') sigSend(msg);
+  if (nt.open && via !== 'peerjs') ntPost(code, Object.assign({ src: peerIdOf(myCode) }, msg));
+}
+function onPeerjs(m){
   if (m.type === 'OPEN'){
+    const was = sig.open;
     sig.open = true; sig.retry = 0; linkStatus('ready');
     clearInterval(sig.hb); sig.hb = setInterval(() => sigSend({ type: 'HEARTBEAT' }), 5000);
-    for (const code of Object.keys(paired)) if (!peers.has(code)) connectTo(code, true);
+    if (!was) onRouteUp();
     return;
   }
   if (m.type === 'ID-TAKEN'){ linkStatus('taken'); return; }
-  if (m.type === 'ERROR'){ return; }
+  if (m.type === 'ERROR') return;
+  onSig(m, 'peerjs');
+}
+function onSig(m, via){
+  if (m.payload && m.payload.mid) m.mid = m.payload.mid;
+  if (m.mid){ if (seenMids.has(m.mid)) return; seenMids.add(m.mid); if (seenMids.size > 500) seenMids.delete(seenMids.values().next().value); }
   const src = typeof m.src === 'string' && m.src.startsWith('pocketplayer-v1-') ? m.src.slice(16).toUpperCase() : '';
-  if (!src) return;
-  if (m.type === 'OFFER') onOffer(src, m.payload || {});
+  if (!src || src === myCode) return;
+  if (m.type === 'OFFER') onOffer(src, m.payload || {}, via);
   else if (m.type === 'ANSWER') onAnswer(src, m.payload || {});
   else if (m.type === 'CANDIDATE') onCandidate(src, m.payload || {});
-  else if (m.type === 'EXPIRE' || m.type === 'LEAVE'){ const p = peers.get(src); if (p && p.state === 'connecting') dropPeer(src, p.quiet ? '' : 'That device isn’t online right now. Check the code, and that Pocket Player is open on it.'); }
+  else if (m.type === 'EXPIRE' || m.type === 'LEAVE'){
+    /* PeerJS only knows about its own route; the ntfy route may still get through */
+    const p = peers.get(src);
+    if (p && p.state === 'connecting' && !nt.open) dropPeer(src, p.quiet ? '' : 'That device isn’t online right now. Check the code, and that Pocket Player is open on it.');
+  }
 }
 
 function makePeer(code, outbound, sid){
   const p = { code, sid, outbound, name: (paired[code] || {}).name || fmtCode(code), kind: (paired[code] || {}).kind || '', state: 'connecting',
     pc: new RTCPeerConnection(RTC_CFG), dc: null, rx: new Map(), lib: null, remote: null, sent: new Set(), lastRid: '', watching: false, quiet: false };
-  p.pc.onicecandidate = e => { if (e.candidate) sigTo(code, 'CANDIDATE', { candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate, sid: p.sid }); };
+  p.candQ = [];
+  p.pc.onicecandidate = e => {
+    if (e.candidate) p.candQ.push(e.candidate.toJSON ? e.candidate.toJSON() : e.candidate);
+    clearTimeout(p.candT);
+    p.candT = setTimeout(() => { if (p.candQ.length){ sigTo(code, 'CANDIDATE', { candidates: p.candQ.splice(0), sid: p.sid }); } }, e.candidate ? 300 : 0);
+  };
   p.pc.onconnectionstatechange = () => {
     const s = p.pc.connectionState;
     if (s === 'failed') dropPeer(code, p.quiet && p.state !== 'open' ? '' : 'Couldn’t link the devices. They connect most reliably on the same Wi-Fi.');
@@ -3397,7 +3464,7 @@ async function connectTo(raw, quiet){
   const code = normCode(raw);
   if (code.length !== 6){ if (!quiet) toast('A device code has 6 letters and numbers, like K7Q-4MX.'); return; }
   if (code === myCode){ if (!quiet) toast('That’s this device’s own code. Type the code shown on your other device.'); return; }
-  if (!sig.open){ if (!quiet) toast('Not connected to the sharing service yet. Check you’re online and try again in a moment.'); return; }
+  if (!sigReady()){ if (!quiet) toast('Not connected to the sharing service yet. Check you’re online and try again in a moment.'); return; }
   const ex = peers.get(code);
   if (ex && (ex.state === 'open' || ex.state === 'connecting')){ if (!quiet) toast(ex.state === 'open' ? `Already connected to ${ex.name}.` : 'Already connecting…'); return; }
   const p = makePeer(code, true, Math.random().toString(36).slice(2, 12)); p.quiet = !!quiet;
@@ -3409,9 +3476,10 @@ async function connectTo(raw, quiet){
   p.timer = setTimeout(() => { if (p.state === 'connecting') dropPeer(code, quiet ? '' : 'That device didn’t answer. Check the code, and that Pocket Player is open on it.'); }, quiet ? 25000 : 60000);
   if (!quiet) toast(`Connecting to ${fmtCode(code)}…`);
 }
-async function onOffer(code, pl){
+async function onOffer(code, pl, via){
   if (!pl.sdp || !pl.sid) return;
   const ex = peers.get(code);
+  if (ex && ex.sid === pl.sid) return;
   if (ex && ex.state === 'connecting' && ex.outbound){
     /* both devices dialled each other at once: the lower code keeps its own call */
     if (myCode < code) return;
@@ -3420,7 +3488,7 @@ async function onOffer(code, pl){
   const ok = paired[code] ? true : await askConnect(String(pl.name || fmtCode(code)).slice(0, 40), pl.kind);
   if (!ok){ sigTo(code, 'ANSWER', { reject: true, sid: pl.sid }); return; }
   const p = makePeer(code, false, pl.sid);
-  p.name = String(pl.name || p.name).slice(0, 40); p.kind = pl.kind || p.kind;
+  p.name = String(pl.name || p.name).slice(0, 40); p.kind = pl.kind || p.kind; p.via = via;
   try {
     await p.pc.setRemoteDescription(pl.sdp);
     for (const c of pendingCands.get(code + pl.sid) || []) await p.pc.addIceCandidate(c).catch(() => {});
@@ -3433,7 +3501,8 @@ async function onOffer(code, pl){
 }
 async function onAnswer(code, pl){
   const p = peers.get(code);
-  if (!p || pl.sid !== p.sid) return;
+  if (!p || pl.sid !== p.sid || p.answered) return;
+  p.answered = true;
   if (pl.reject){ dropPeer(code, `${p.quiet ? '' : 'The other device didn’t allow the connection.'}`); if (paired[code] && p.quiet){ delete paired[code]; savePaired(); } return; }
   p.name = String(pl.name || p.name).slice(0, 40); p.kind = pl.kind || p.kind;
   try {
@@ -3444,11 +3513,12 @@ async function onAnswer(code, pl){
   paired[code] = { name: p.name, kind: p.kind, last: Date.now() }; savePaired(); paintLink();
 }
 async function onCandidate(code, pl){
-  if (!pl.candidate) return;
+  const list = Array.isArray(pl.candidates) ? pl.candidates : pl.candidate ? [pl.candidate] : [];
+  if (!list.length) return;
   const p = peers.get(code);
-  if (p && p.sid === pl.sid && p.pc.remoteDescription){ try { await p.pc.addIceCandidate(pl.candidate); } catch(e){} return; }
+  if (p && p.sid === pl.sid && p.pc.remoteDescription){ for (const c of list){ try { await p.pc.addIceCandidate(c); } catch(e){} } return; }
   const k = code + pl.sid; if (!pendingCands.has(k)) pendingCands.set(k, []);
-  pendingCands.get(k).push(pl.candidate);
+  pendingCands.get(k).push(...list);
 }
 function setupChannel(p, dc){
   p.dc = dc; dc.binaryType = 'arraybuffer'; dc.bufferedAmountLowThreshold = 1 << 20;
@@ -3732,7 +3802,7 @@ function applySync(p, m){
 let devView = null;
 function devLabel(st){
   return { connecting: 'Connecting to the sharing service…', ready: 'Ready. Other devices can connect with this code.',
-    offline: 'Offline. Check this device is connected to the internet.', taken: 'Reconnecting…', off: 'Off' }[st] || '';
+    offline: 'Can’t reach the sharing services. Check this device is online; it keeps retrying.', taken: 'Reconnecting…', off: 'Off' }[st] || '';
 }
 function paintLink(){
   const n = openPeers().length, b = $('#linkBadge');
@@ -3742,7 +3812,9 @@ function paintLink(){
 }
 function paintDevicesStatus(){
   const el = $('#devStatus'); if (!el) return;
-  el.innerHTML = `<span class="dot ${sig.status === 'ready' ? 'on' : sig.status === 'connecting' || sig.status === 'taken' ? 'wait' : ''}"></span>${esc(devLabel(sig.status))}`;
+  const st = overallStatus(); sig.status = st;
+  const routes = `Routes: PeerJS ${sig.open ? '✓' : '✗'} · ntfy ${nt.open ? '✓' : '✗'}`;
+  el.innerHTML = `<span class="dot ${st === 'ready' ? 'on' : st === 'connecting' ? 'wait' : ''}"></span>${esc(devLabel(st))}<div class="dev-routes">${routes}</div>`;
 }
 function paintDevicesList(){
   const ul = $('#devList'); if (!ul) return;
@@ -3819,7 +3891,8 @@ function openDevices(view){
       else if (act === 'leave') tgLeave(false);
     };
     paintDevicesStatus(); paintDevicesList(); paintXfers();
-    if (!sig.open && sig.status !== 'connecting') sigConnect();
+    if (!sig.open && sig.pstatus !== 'connecting') sigConnect();
+    if (!nt.open && !nt.connecting) ntConnect();
     return;
   }
   const p = peers.get(devView.code);
@@ -3893,8 +3966,8 @@ function linkInit(){
   if (!LINK.on) return;
   $('#linkBtn').hidden = false; $('#linkBtn').onclick = () => openDevices();
   $('#tgPill').onclick = () => tgLeave(false);
-  sigConnect();
-  window.addEventListener('online', () => { if (!sig.open) sigConnect(); });
+  sigConnect(); ntConnect();
+  window.addEventListener('online', () => { if (!sig.open) sigConnect(); if (!nt.open) ntConnect(); });
   /* the host keeps everyone in sync; watchers get what's playing */
   setInterval(() => {
     if (tg.guests.size) tgTick();

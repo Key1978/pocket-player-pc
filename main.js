@@ -40,6 +40,10 @@ const HOTKEYS = {
   'CommandOrControl+Alt+M': 'mini'
 };
 
+// Linking devices: share this PC's real Wi-Fi address with the other device instead of a hidden
+// ".local" name, which phones often can't look up, so devices on the same Wi-Fi can reach each other.
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
+
 protocol.registerSchemesAsPrivileged([{
   scheme: 'pocket',
   privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true }
