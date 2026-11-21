@@ -88,10 +88,10 @@ video::cue{font-family:var(--f-body);background:rgba(0,0,0,.62);color:#fff}
 .fs-btn{position:absolute;right:10px;bottom:10px;border:0;border-radius:10px;background:rgba(0,0,0,.55);color:#fff;padding:8px}
 .screen.is-video .fs-btn{display:none}
 .vc-dim{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:1;transition:opacity .08s}
-.vc{position:absolute;inset:0;z-index:3;display:grid;grid-template-rows:auto 1fr auto;color:#fff;
+.vc{position:absolute;inset:0;z-index:3;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);color:#fff;
   background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 28%,transparent 62%,rgba(0,0,0,.7));opacity:1;transition:opacity .2s;pointer-events:none}
 .vc.fade{opacity:0}
-.vc > *{pointer-events:auto}
+.vc > *{pointer-events:auto;min-width:0}
 .vc-top,.vc-bot{display:flex;align-items:center;gap:6px;padding:8px 10px}
 .vc-mid{display:flex;align-items:center;justify-content:center;gap:clamp(6px,4vw,28px);pointer-events:none}
 .vc-mid > *{pointer-events:auto}
